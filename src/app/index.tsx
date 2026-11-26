@@ -8,49 +8,33 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/context/ThemeContext";
 import api from "@/api/axios";
-
-interface Song {
-  id: number;
-  title: string;
-  song_type: string | null;
-  file_path: string;
-  cover_path: string | null;
-  duration_seconds: number;
-  season: number | null;
-  anime: string | null;
-  artist: string | null;
-  genres: string[];
-}
-
-const formatDuration = (seconds?: number) => {
-  if (!seconds) return "--:--";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
-
-const getCoverUri = (path: string | null) => {
-  if (!path) return undefined;
-  return path.startsWith("http")
-    ? path
-    : `https://yumetunes.duckdns.org${path}`;
-};
+import { usePlayback } from "@/context/PlaybackContext";
+import { useSongs } from "@/context/SongContext";
+import { useTheme } from "@/context/ThemeContext";
+import { PaginatedResponse, Song } from "@/types";
+import { formatDuration, getMediaUrl } from "@/utils";
 
 export default function HomeScreen() {
   const { themeFamily, setThemeFamily, themeMode, toggleThemeMode, colors } =
     useTheme();
+  const { currentSong, isShuffle, playQueue, nextSong, prevSong, toggleShuffle } =
+    useSongs();
+  const { isPlaying, isBuffering, currentTime, duration, togglePlay } =
+    usePlayback();
+
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get("/songs/all")
+      .get<PaginatedResponse<Song>>("/songs/all")
       .then((res) => setSongs(res.data?.data ?? []))
       .catch((err) =>
-        setError(err.response?.status ? `HTTP ${err.response.status}` : err.message)
+        setError(
+          err.response?.status ? `HTTP ${err.response.status}` : err.message
+        )
       )
       .finally(() => setLoading(false));
   }, []);
@@ -60,8 +44,12 @@ export default function HomeScreen() {
       {/* Header */}
       <View className="mb-4 flex-row items-center justify-between">
         <View>
-          <Text className="text-2xl font-bold text-accent-primary">YumeTunes</Text>
-          <Text className="text-xs text-text-muted">{songs.length} tracks loaded</Text>
+          <Text className="text-2xl font-bold text-accent-primary">
+            YumeTunes
+          </Text>
+          <Text className="text-xs text-text-muted">
+            {songs.length} tracks loaded
+          </Text>
         </View>
 
         <View className="flex-row gap-2">
@@ -99,11 +87,20 @@ export default function HomeScreen() {
         data={songs}
         keyExtractor={(item) => String(item.id)}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        renderItem={({ item }) => {
-          const coverUri = getCoverUri(item.cover_path);
+        contentContainerStyle={{ paddingBottom: 16 }}
+        renderItem={({ item, index }) => {
+          const coverUri = getMediaUrl(item.cover_path, "image", 200);
+          const isCurrent = currentSong?.id === item.id;
+
           return (
-            <Pressable className="mb-2.5 flex-row items-center gap-3 rounded-xl border border-border bg-background-secondary p-2.5 active:bg-background-hover">
+            <Pressable
+              onPress={() => playQueue(songs, index)}
+              className={`mb-2.5 flex-row items-center gap-3 rounded-xl border p-2.5 active:bg-background-hover ${
+                isCurrent
+                  ? "border-accent-primary bg-background-active"
+                  : "border-border bg-background-secondary"
+              }`}
+            >
               {coverUri ? (
                 <Image
                   source={{ uri: coverUri }}
@@ -118,7 +115,9 @@ export default function HomeScreen() {
 
               <View className="flex-1">
                 <Text
-                  className="text-sm font-semibold text-text-primary"
+                  className={`text-sm font-semibold ${
+                    isCurrent ? "text-accent-primary" : "text-text-primary"
+                  }`}
                   numberOfLines={1}
                 >
                   {item.title}
@@ -130,7 +129,7 @@ export default function HomeScreen() {
                   {[item.artist, item.anime].filter(Boolean).join(" • ")}
                 </Text>
 
-                {item.genres?.length > 0 && (
+                {item.genres && item.genres.length > 0 && (
                   <View className="mt-1.5 flex-row flex-wrap gap-1">
                     {item.genres.slice(0, 2).map((genre) => (
                       <View
@@ -153,6 +152,66 @@ export default function HomeScreen() {
           );
         }}
       />
+
+      {/* Temporary Test Mini-Player */}
+      {currentSong && (
+        <View className="mb-2 mt-2 rounded-xl border border-border bg-background-secondary px-3.5 py-3">
+          <View className="flex-row items-center justify-between">
+            <View className="mr-3 flex-1">
+              <Text
+                className="text-sm font-semibold text-accent-primary"
+                numberOfLines={1}
+              >
+                {currentSong.title}
+              </Text>
+              <Text className="mt-0.5 text-xs text-text-muted">
+                {isBuffering
+                  ? "Buffering..."
+                  : `${formatDuration(currentTime)} / ${formatDuration(
+                      duration || currentSong.duration_seconds
+                    )}`}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center gap-1.5">
+              <Pressable
+                onPress={toggleShuffle}
+                className={`rounded-lg px-2.5 py-2 ${
+                  isShuffle ? "bg-accent-secondary" : "bg-background-hover"
+                }`}
+              >
+                <Text className="text-xs font-medium text-text-primary">
+                  Shuf
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => prevSong()}
+                className="rounded-lg bg-background-hover px-2.5 py-2"
+              >
+                <Text className="text-xs font-medium text-text-primary">
+                  Prev
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={togglePlay}
+                className="rounded-lg bg-accent-primary px-3 py-2"
+              >
+                <Text className="text-xs font-semibold text-text-primary">
+                  {isPlaying ? "Pause" : "Play"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => nextSong()}
+                className="rounded-lg bg-background-hover px-2.5 py-2"
+              >
+                <Text className="text-xs font-medium text-text-primary">
+                  Next
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
