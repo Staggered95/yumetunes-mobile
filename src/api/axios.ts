@@ -11,8 +11,11 @@ const AUTH_SKIP_URLS = [
   "/auth/google",
 ];
 
-interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+const LOADING_SKIP_URLS = ["/user/telemetry", "/auth/refresh"];
+
+interface CustomRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _skipLoading?: boolean;
 }
 
 interface AuthCallbacks {
@@ -20,12 +23,23 @@ interface AuthCallbacks {
   onAuthFailure?: () => void;
 }
 
+interface LoadingCallbacks {
+  startLoading?: () => void;
+  stopLoading?: () => void;
+}
+
 let authCallbacks: AuthCallbacks = {};
+let loadingCallbacks: LoadingCallbacks = {};
 let refreshPromise: Promise<string> | null = null;
 
 /** Called once by AuthContext so Axios can sync React state without circular imports */
 export const setAuthCallbacks = (callbacks: AuthCallbacks) => {
   authCallbacks = callbacks;
+};
+
+/** Called once by LoadingContext so Axios can drive the global loading bar */
+export const setLoadingCallbacks = (callbacks: LoadingCallbacks) => {
+  loadingCallbacks = callbacks;
 };
 
 const api = axios.create({
@@ -34,9 +48,19 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// 1. Attach Bearer token from SecureStore
+// 1. Attach Bearer token + trigger loading state
 api.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
+  async (config: CustomRequestConfig) => {
+    const requestUrl = config.url ?? "";
+    const shouldSkipLoading =
+      config._skipLoading ||
+      LOADING_SKIP_URLS.some((url) => requestUrl.includes(url));
+
+    config._skipLoading = shouldSkipLoading;
+    if (!shouldSkipLoading) {
+      loadingCallbacks.startLoading?.();
+    }
+
     const token = await tokenStorage.getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -46,11 +70,21 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. Auto-refresh on 401 (deduplicated across parallel requests)
+// 2. Stop loading + auto-refresh on 401 (deduplicated across parallel requests)
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config as CustomRequestConfig | undefined;
+    if (!config?._skipLoading) {
+      loadingCallbacks.stopLoading?.();
+    }
+    return response;
+  },
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryableRequestConfig | undefined;
+    const originalRequest = error.config as CustomRequestConfig | undefined;
+    if (!originalRequest?._skipLoading) {
+      loadingCallbacks.stopLoading?.();
+    }
+
     const requestUrl = originalRequest?.url ?? "";
     const isAuthEndpoint = AUTH_SKIP_URLS.some((url) =>
       requestUrl.includes(url)
