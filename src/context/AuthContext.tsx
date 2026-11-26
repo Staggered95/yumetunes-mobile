@@ -10,11 +10,17 @@ import api, { setAuthCallbacks } from "@/api/axios";
 import { tokenStorage } from "@/api/tokenStorage";
 import { ApiResponse, User } from "@/types";
 
+export type AuthModalView = "login" | "register" | "forgot";
+
 interface AuthContextValue {
   isLoggedIn: boolean;
   user: User | null;
   token: string | null;
   isCheckingAuth: boolean;
+  isAuthModalOpen: boolean;
+  authModalView: AuthModalView;
+  openAuthModal: (view?: AuthModalView) => void;
+  closeAuthModal: () => void;
   login: (newToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -26,6 +32,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalView, setAuthModalView] = useState<AuthModalView>("login");
+
+  const openAuthModal = useCallback((view: AuthModalView = "login") => {
+    setAuthModalView(view);
+    setIsAuthModalOpen(true);
+  }, []);
+
+  const closeAuthModal = useCallback(() => {
+    setIsAuthModalOpen(false);
+  }, []);
 
   const clearLocalSession = useCallback(async () => {
     await tokenStorage.clearAccessToken();
@@ -64,6 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await tokenStorage.setAccessToken(newToken);
       setToken(newToken);
       await fetchUser();
+      setIsAuthModalOpen(false);
     },
     [fetchUser]
   );
@@ -115,6 +133,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         token,
         isCheckingAuth,
+        isAuthModalOpen,
+        authModalView,
+        openAuthModal,
+        closeAuthModal,
         login,
         logout,
         refreshUser: fetchUser,
