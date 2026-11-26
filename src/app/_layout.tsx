@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { UserProvider } from "@/context/UserContext";
 
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
