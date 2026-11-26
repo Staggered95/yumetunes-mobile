@@ -1,9 +1,9 @@
 import "../global.css";
 import { useEffect } from "react";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import AppShell from "@/layout/AppShell";
 import { AuthProvider } from "@/context/AuthContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import { PlaybackProvider } from "@/context/PlaybackContext";
@@ -42,7 +42,7 @@ export default function RootLayout() {
                 <SongProvider>
                   <ThemeProvider>
                     <ToastProvider>
-                      <Stack screenOptions={{ headerShown: false }} />
+                      <AppShell />
                     </ToastProvider>
                   </ThemeProvider>
                 </SongProvider>
