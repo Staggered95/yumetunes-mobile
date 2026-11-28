@@ -19,8 +19,8 @@ export const getMediaUrl = (
   path: string | null | undefined,
   type: MediaType = "image",
   width = 800
-): string | null => {
-  if (!path) return null;
+): string | undefined => {
+  if (!path) return undefined;
 
   if (path.startsWith("http://") || path.startsWith("https://")) {
     // Smart Cloudinary optimizer

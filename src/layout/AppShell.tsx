@@ -19,7 +19,7 @@ export default function AppShell() {
     <View className="flex-1 bg-background-primary">
       <StatusBar
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
-    />
+      />
 
       <GlobalProgressBar />
       <Navbar />
@@ -32,7 +32,39 @@ export default function AppShell() {
             contentStyle: { backgroundColor: colors["--bg-primary"] },
             animation: "fade",
           }}
-        />
+        >
+          {/* Top-level screens */}
+          <Stack.Screen name="index" />
+          <Stack.Screen name="animes" />
+          <Stack.Screen name="artist-list" />
+          <Stack.Screen name="genres" />
+          <Stack.Screen name="library" />
+          <Stack.Screen name="likedsongs" />
+          <Stack.Screen name="search" />
+          <Stack.Screen name="profile" />
+
+          {/* Detail screens (native push transition) */}
+          <Stack.Screen
+            name="anime/[animeName]"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="artist/[artistName]"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="genre/[genreName]"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="playlists/[id]"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="reset-password/[id]/[token]"
+            options={{ animation: "slide_from_right" }}
+          />
+        </Stack>
       </View>
 
       {/* Persistent Bottom Stack */}
